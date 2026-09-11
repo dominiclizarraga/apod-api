@@ -18,7 +18,8 @@ No one watching this repository has anything to do with Astronomy Photo of the D
     1. [Standard environment](#standard_env)
     2. [Cosmic Birthday demo](#birthday)
     3. [Docker environment](#docker)
-    4. [Running Tests](#tests)
+    4. [Deploy to Build.io](#buildio)
+    5. [Running Tests](#tests)
 2. [Docs](#docs)
 3. [APOD parser](#TheAPODParser)
 4. [Deployed](#Deployed)
@@ -85,6 +86,16 @@ cd apod-api
 ```bash
 docker compose up --build
 ```
+
+### Deploy to Build.io <a name="buildio"></a>
+
+1. Push your changes to GitHub and enable GitHub in your Build.io dashboard.
+2. Create an app, then set **Settings → Stack** to **dockerfile**.
+3. In **Deploy**, connect `dominiclizarraga/apod-api`, select `main`, and click **Deploy Branch**.
+4. Once it is running, open the app's public URL with `/birthday` at the end.
+
+The container starts Gunicorn on Build.io's assigned `PORT`. No database or NASA
+API key is needed. See the [Build.io deployment guide](https://docs.build.io/guides/deploying-applications/).
 
 
 &nbsp;

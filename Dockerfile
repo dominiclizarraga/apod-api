@@ -11,7 +11,7 @@ WORKDIR /app
 # If you change your code but not your dependencies, this step will be skipped.
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies into the system python environment.
+# Install locked production dependencies into /app/.venv.
 RUN uv sync --frozen --no-dev
 
 # This makes 'gunicorn' and 'flask' available globally in the container
@@ -25,5 +25,6 @@ EXPOSE 5000
 
 # Run the production server
 # -w 4: Run 4 worker processes
-# -b 0.0.0.0:5000: Listen on all interfaces on port 5000
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--access-logfile", "-", "application:app"]
+# Use the hosting platform's PORT, or port 5000 for local Docker runs.
+# exec lets Gunicorn receive shutdown signals directly.
+CMD ["sh", "-c", "exec gunicorn -w 4 -b \"0.0.0.0:${PORT:-5000}\" --access-logfile - application:app"]
