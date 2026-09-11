@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Your Cosmic Birthday{% endblock %}</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #081226; color: #eef4ff; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at 25% 10%, #263b83, transparent 38%), #081226; }
+    main { width: min(760px, calc(100% - 32px)); padding: 48px 0; }
+    h1 { font-size: clamp(2.2rem, 7vw, 4.5rem); line-height: .95; margin: 0; letter-spacing: -.06em; }
+    .lede { color: #b6c7e9; max-width: 600px; font-size: 1.1rem; line-height: 1.55; }
+    input, button { border-radius: 10px; border: 1px solid #6681b9; padding: 13px 16px; font: inherit; }
+    input { background: #101f3b; color: inherit; }
+    button { background: #f5c451; color: #17213a; cursor: pointer; font-weight: 800; }
+    .eyebrow { color: #f5c451; font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    #status { min-height: 24px; color: #f5c451; }
+    [hidden] { display: none !important; }
+    {% block styles %}{% endblock %}
+  </style>
+</head>
+<body>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    const apodImageUrl = (apod) => (apod.media_type === "video" ? apod.thumbnail_url : apod.url);
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

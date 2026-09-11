@@ -26,9 +26,11 @@ from flask import (
     Response,
     current_app,
     jsonify,
+    redirect,
     render_template,
     request,
     stream_with_context,
+    url_for,
 )
 from flask_cors import CORS
 
@@ -344,12 +346,6 @@ def _get_json_for_date_range(start_date, end_date, use_concept_tags, thumbs):
 #
 
 
-@app.route("/")
-@app.route("/birthday")
-def birthday():
-    return render_template("birthday.html", today=datetime.today().date().isoformat())
-
-
 @app.route("/docs")
 def docs():
     return render_template(
@@ -358,6 +354,48 @@ def docs():
         service_url=request.host,
         methodname=APOD_METHOD_NAME,
         usage=_usage(joinstr='", "', prestr='"') + '"',
+    )
+
+
+FIRST_APOD_DAY = date(1995, 6, 16)
+
+
+def _parse_birthday(day):
+    """Return the date for a YYYY-MM-DD string within the APOD archive, else None."""
+    try:
+        dt = datetime.strptime(day or "", "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    if not FIRST_APOD_DAY <= dt <= datetime.today().date():
+        return None
+    return dt
+
+
+@app.route("/")
+@app.route("/birthday")
+def birthday():
+    error = None
+    day = request.args.get("date")
+    if day is not None:
+        # The date form submits here with GET; send valid dates to their own page.
+        if _parse_birthday(day):
+            return redirect(url_for("sky", day=day))
+        error = "Pick a date between June 16, 1995 and today."
+    return render_template(
+        "birthday.html",
+        today=datetime.today().date().isoformat(),
+        first_day=FIRST_APOD_DAY.isoformat(),
+        error=error,
+    )
+
+
+@app.route("/birthday/<day>")
+def sky(day):
+    dt = _parse_birthday(day)
+    if not dt:
+        return redirect(url_for("birthday", date=day))
+    return render_template(
+        "sky.html", day=dt.isoformat(), pretty_date=f"{dt:%B} {dt.day}, {dt.year}"
     )
 
 

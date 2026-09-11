@@ -1,0 +1,153 @@
+{% extends "birthday_base.html" %}
+{% block title %}Your sky on {{ pretty_date }}{% endblock %}
+
+{% block styles %}
+    .back { display: inline-flex; gap: 6px; color: #b6c7e9; text-decoration: none; font-weight: 700; }
+    .back:hover { color: #f5c451; }
+    .sky-header { margin: 28px 0 20px; }
+    .sky-header h1 { font-size: clamp(2rem, 6vw, 3.6rem); }
+    .card { display: none; overflow: hidden; border: 1px solid #38538a; border-radius: 18px; background: #101d36; }
+    .card.show { display: block; }
+    img, video { display: block; width: 100%; max-height: 480px; object-fit: cover; }
+    .media { position: relative; background: #050b18; }
+    .animate-btn { position: absolute; right: 14px; bottom: 14px; padding: 9px 14px; border: 1px solid rgba(245, 196, 81, .7); border-radius: 999px; background: rgba(8, 18, 38, .72); color: #f5c451; font-size: .9rem; backdrop-filter: blur(6px); transition: background .15s, transform .15s; }
+    .animate-btn:hover { background: rgba(8, 18, 38, .9); transform: translateY(-1px); }
+    .animate-btn:disabled { opacity: .5; cursor: progress; }
+    .media-overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; background: rgba(5, 11, 24, .68); color: #eef4ff; font-weight: 700; text-align: center; padding: 16px; }
+    .spinner { width: 38px; height: 38px; border: 3px solid rgba(245, 196, 81, .25); border-top-color: #f5c451; border-radius: 50%; animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .copy { padding: 24px; }
+    h2 { margin: 8px 0; font-size: 1.75rem; }
+    #constellation { font-size: 1.3rem; font-weight: 700; color: #d6e3ff; }
+    #explanation { line-height: 1.55; color: #c2d0ed; }
+    #source { color: #9fb8ff; }
+{% endblock %}
+
+{% block content %}
+    <a class="back" href="{{ url_for('birthday') }}">← Pick another date</a>
+    <header class="sky-header">
+      <p class="eyebrow">Your cosmic birthday</p>
+      <h1>{{ pretty_date }}</h1>
+    </header>
+    <p id="status" role="status">Looking up your sky…</p>
+    <article class="card" id="result">
+      <div class="media">
+        <img id="image" alt="Astronomy Picture of the Day" hidden>
+        <video id="clip" controls loop playsinline hidden></video>
+        <button type="button" class="animate-btn" id="animate" title="Generates a 5-second AI video (about $0.40)" hidden>✨ Bring it to life</button>
+        <div class="media-overlay" id="render-overlay" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <span id="render-status"></span>
+        </div>
+      </div>
+      <div class="copy">
+        <h2 id="title"></h2>
+        <p id="constellation"></p>
+        <p id="explanation"></p>
+        <a id="source" target="_blank" rel="noreferrer">Open the original APOD</a>
+      </div>
+    </article>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const DAY = {{ day | tojson }};
+    const constellations = ["Andromeda", "Antlia", "Apus", "Aquarius", "Aquila", "Ara", "Aries", "Auriga", "Boötes", "Caelum", "Camelopardalis", "Cancer", "Canes Venatici", "Canis Major", "Canis Minor", "Capricornus", "Carina", "Cassiopeia", "Centaurus", "Cepheus", "Cetus", "Chamaeleon", "Circinus", "Columba", "Coma Berenices", "Corona Australis", "Corona Borealis", "Corvus", "Crater", "Crux", "Cygnus", "Delphinus", "Dorado", "Draco", "Equuleus", "Eridanus", "Fornax", "Gemini", "Grus", "Hercules", "Horologium", "Hydra", "Hydrus", "Indus", "Lacerta", "Leo", "Lepus", "Libra", "Lupus", "Lynx", "Lyra", "Mensa", "Microscopium", "Monoceros", "Musca", "Norma", "Octans", "Ophiuchus", "Orion", "Pavo", "Pegasus", "Perseus", "Phoenix", "Pictor", "Pisces", "Piscis Austrinus", "Puppis", "Pyxis", "Reticulum", "Sagitta", "Sagittarius", "Scorpius", "Sculptor", "Scutum", "Serpens", "Sextans", "Taurus", "Telescopium", "Triangulum", "Tucana", "Ursa Major", "Ursa Minor", "Vela", "Virgo", "Volans", "Vulpecula"];
+    const status = document.querySelector("#status");
+    const result = document.querySelector("#result");
+    const image = document.querySelector("#image");
+    const clip = document.querySelector("#clip");
+    const animateButton = document.querySelector("#animate");
+    const renderOverlay = document.querySelector("#render-overlay");
+    const renderStatus = document.querySelector("#render-status");
+    const POLL_MS = 10000;
+    const STAGE_COPY = {
+      moderating: "Checking your image…",
+      translating: "Waiting in the render queue…",
+      queued: "Waiting in the render queue…",
+      in_progress: "Rendering your video… this takes a few minutes",
+    };
+    const ERROR_COPY = {
+      agreement_required: "Accept the Video Service Terms in the aiand console playground, then try again.",
+      insufficient_credits: "Your aiand balance doesn't cover this render.",
+      concurrency_limit_exceeded: "Too many renders in progress. Try again when one finishes.",
+      moderation_blocked: "This image was rejected by content moderation.",
+      not_configured: "Video generation isn't set up yet. Add AIAND_API_KEY to .env.",
+    };
+    let currentApod = null;
+    let renderToken = 0;
+
+    function renderFailed(code, message) {
+      renderOverlay.hidden = true;
+      animateButton.disabled = false;
+      status.textContent = ERROR_COPY[code] || message || "Video generation failed. Please try again.";
+    }
+
+    async function readJson(response) {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw Object.assign(new Error(body.msg), { code: body.code });
+      return body;
+    }
+
+    animateButton.addEventListener("click", async () => {
+      if (!currentApod) return;
+      const token = ++renderToken;
+      animateButton.disabled = true;
+      status.textContent = "";
+      renderStatus.textContent = "Sending your sky to the renderer…";
+      renderOverlay.hidden = false;
+      try {
+        let job = await readJson(await fetch("/v1/video/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_url: currentApod.imageUrl, title: currentApod.title }),
+        }));
+        while (!["completed", "failed", "canceled"].includes(job.status)) {
+          renderStatus.textContent = STAGE_COPY[job.status] || "Working on your video…";
+          await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+          if (token !== renderToken) return;
+          job = await readJson(await fetch(`/v1/video/${encodeURIComponent(job.id)}`));
+        }
+        if (job.status !== "completed") {
+          return renderFailed(job.error?.code, job.error?.message || `Video ${job.status}.`);
+        }
+        clip.src = `/v1/video/${encodeURIComponent(job.id)}/content`;
+        image.hidden = true;
+        animateButton.hidden = true;
+        renderOverlay.hidden = true;
+        clip.hidden = false;
+        clip.play().catch(() => {});
+      } catch (error) {
+        if (token === renderToken) renderFailed(error.code, error.message);
+      }
+    });
+
+    function showApod(apod) {
+      const text = `${apod.title || ""} ${apod.explanation || ""}`;
+      const found = constellations.filter((name) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "i").test(text));
+      document.querySelector("#title").textContent = apod.title;
+      document.querySelector("#constellation").textContent = found.length ? `Constellation mentioned: ${found.join(", ")}` : "No constellation is named in this APOD.";
+      document.querySelector("#explanation").textContent = apod.explanation;
+      const imageUrl = apodImageUrl(apod);
+      image.src = imageUrl || "";
+      image.hidden = !imageUrl;
+      animateButton.hidden = !imageUrl;
+      currentApod = imageUrl ? { imageUrl, title: apod.title } : null;
+      document.querySelector("#source").href = apod.url;
+      document.querySelector("#source").textContent = apod.media_type === "video" ? "Open the APOD video" : "Open the full image";
+      result.classList.add("show");
+      status.textContent = "";
+    }
+
+    (async () => {
+      try {
+        const response = await fetch(`/v1/apod/?date=${encodeURIComponent(DAY)}&thumbs=True`);
+        const apod = await response.json();
+        if (!response.ok) throw new Error(apod.msg || "No APOD was found for that date.");
+        showApod(apod);
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    })();
+  </script>
+{% endblock %}
