@@ -16,7 +16,14 @@
     button { background: #f5c451; color: #17213a; cursor: pointer; font-weight: 800; }
     .card { display: none; overflow: hidden; border: 1px solid #38538a; border-radius: 18px; background: #101d36; }
     .card.show { display: block; }
-    img { display: block; width: 100%; max-height: 400px; object-fit: cover; }
+    img, video { display: block; width: 100%; max-height: 400px; object-fit: cover; }
+    .media { position: relative; background: #050b18; }
+    .animate-btn { position: absolute; right: 14px; bottom: 14px; padding: 9px 14px; border: 1px solid rgba(245, 196, 81, .7); border-radius: 999px; background: rgba(8, 18, 38, .72); color: #f5c451; font-size: .9rem; backdrop-filter: blur(6px); transition: background .15s, transform .15s; }
+    .animate-btn:hover { background: rgba(8, 18, 38, .9); transform: translateY(-1px); }
+    .animate-btn:disabled { opacity: .5; cursor: progress; }
+    .media-overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; background: rgba(5, 11, 24, .68); color: #eef4ff; font-weight: 700; text-align: center; padding: 16px; }
+    .spinner { width: 38px; height: 38px; border: 3px solid rgba(245, 196, 81, .25); border-top-color: #f5c451; border-radius: 50%; animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .copy { padding: 24px; }
     .eyebrow { color: #f5c451; font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
     h2 { margin: 8px 0; font-size: 1.75rem; }
@@ -24,6 +31,7 @@
     #explanation { line-height: 1.55; color: #c2d0ed; }
     #status { min-height: 24px; color: #f5c451; }
     .note { color: #9fb0d3; font-size: .9rem; }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
@@ -37,7 +45,15 @@
     </form>
     <p id="status" role="status"></p>
     <article class="card" id="result">
-      <img id="image" alt="Astronomy Picture of the Day" hidden>
+      <div class="media">
+        <img id="image" alt="Astronomy Picture of the Day" hidden>
+        <video id="clip" controls loop playsinline hidden></video>
+        <button type="button" class="animate-btn" id="animate" title="Generates a 5-second AI video (about $0.40)" hidden>✨ Bring it to life</button>
+        <div class="media-overlay" id="render-overlay" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <span id="render-status"></span>
+        </div>
+      </div>
       <div class="copy">
         <p class="eyebrow" id="date-label"></p>
         <h2 id="title"></h2>
@@ -53,11 +69,93 @@
     const form = document.querySelector("#birthday-form");
     const status = document.querySelector("#status");
     const result = document.querySelector("#result");
+    const image = document.querySelector("#image");
+    const clip = document.querySelector("#clip");
+    const animateButton = document.querySelector("#animate");
+    const renderOverlay = document.querySelector("#render-overlay");
+    const renderStatus = document.querySelector("#render-status");
+    const POLL_MS = 10000;
+    const STAGE_COPY = {
+      moderating: "Checking your image…",
+      translating: "Waiting in the render queue…",
+      queued: "Waiting in the render queue…",
+      in_progress: "Rendering your video… this takes a few minutes",
+    };
+    const ERROR_COPY = {
+      agreement_required: "Accept the Video Service Terms in the aiand console playground, then try again.",
+      insufficient_credits: "Your aiand balance doesn't cover this render.",
+      concurrency_limit_exceeded: "Too many renders in progress. Try again when one finishes.",
+      moderation_blocked: "This image was rejected by content moderation.",
+      not_configured: "Video generation isn't set up yet. Add AIAND_API_KEY to .env.",
+    };
+    let currentApod = null;
+    let renderToken = 0;
+
+    function resetMedia(hasImage) {
+      renderToken += 1;
+      clip.pause();
+      clip.removeAttribute("src");
+      clip.hidden = true;
+      image.hidden = !hasImage;
+      animateButton.hidden = !hasImage;
+      animateButton.disabled = false;
+      renderOverlay.hidden = true;
+    }
+
+    function renderFailed(code, message) {
+      renderOverlay.hidden = true;
+      animateButton.disabled = false;
+      status.textContent = ERROR_COPY[code] || message || "Video generation failed. Please try again.";
+    }
+
+    async function readJson(response) {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw Object.assign(new Error(body.msg), { code: body.code });
+      return body;
+    }
+
+    animateButton.addEventListener("click", async () => {
+      if (!currentApod) return;
+      const token = ++renderToken;
+      animateButton.disabled = true;
+      status.textContent = "";
+      renderStatus.textContent = "Sending your sky to the renderer…";
+      renderOverlay.hidden = false;
+      try {
+        let job = await readJson(await fetch("/v1/video/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_url: currentApod.imageUrl, title: currentApod.title }),
+        }));
+        while (!["completed", "failed", "canceled"].includes(job.status)) {
+          if (token !== renderToken) return;
+          renderStatus.textContent = STAGE_COPY[job.status] || "Working on your video…";
+          await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+          if (token !== renderToken) return;
+          job = await readJson(await fetch(`/v1/video/${encodeURIComponent(job.id)}`));
+        }
+        if (token !== renderToken) return;
+        if (job.status !== "completed") {
+          return renderFailed(job.error?.code, job.error?.message || `Video ${job.status}.`);
+        }
+        clip.src = `/v1/video/${encodeURIComponent(job.id)}/content`;
+        image.hidden = true;
+        animateButton.hidden = true;
+        renderOverlay.hidden = true;
+        clip.hidden = false;
+        clip.play().catch(() => {});
+      } catch (error) {
+        if (token === renderToken) renderFailed(error.code, error.message);
+      }
+    });
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const birthday = document.querySelector("#birthdate").value;
       status.textContent = "Looking up your cosmic birthday…";
       result.classList.remove("show");
+      currentApod = null;
+      resetMedia(false);
       try {
         const response = await fetch(`/v1/apod/?date=${encodeURIComponent(birthday)}&thumbs=True`);
         const apod = await response.json();
@@ -68,10 +166,10 @@
         document.querySelector("#title").textContent = apod.title;
         document.querySelector("#constellation").textContent = found.length ? `Constellation mentioned: ${found.join(", ")}` : "No constellation is named in this APOD.";
         document.querySelector("#explanation").textContent = apod.explanation;
-        const image = document.querySelector("#image");
         const imageUrl = apod.media_type === "video" ? apod.thumbnail_url : apod.url;
-        image.hidden = !imageUrl;
         image.src = imageUrl || "";
+        currentApod = imageUrl ? { imageUrl, title: apod.title } : null;
+        resetMedia(Boolean(imageUrl));
         document.querySelector("#source").href = apod.url;
         document.querySelector("#source").textContent = apod.media_type === "video" ? "Open the APOD video" : "Open the full image";
         result.classList.add("show");

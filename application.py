@@ -20,10 +20,22 @@ import os
 from datetime import date, datetime, timezone
 from random import shuffle
 
-from flask import Flask, current_app, jsonify, render_template, request
+from dotenv import load_dotenv
+from flask import (
+    Flask,
+    Response,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    stream_with_context,
+)
 from flask_cors import CORS
 
+from apod import video
 from apod.utility import get_concepts, parse_apod
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(
@@ -346,6 +358,65 @@ def home():
 @app.route("/birthday")
 def birthday():
     return render_template("birthday.html", today=datetime.today().date().isoformat())
+
+
+def _video_error(err):
+    response = jsonify(code=err.code, msg=err.message)
+    response.status_code = err.status
+    return response
+
+
+@app.route("/" + SERVICE_VERSION + "/video/", methods=["POST"])
+def create_video():
+    body = request.get_json(silent=True) or {}
+    try:
+        file_id = video.upload_image(body.get("image_url"))
+        job = video.create_job(file_id, body.get("title"))
+    except video.VideoAPIError as err:
+        return _video_error(err)
+    except Exception as ex:
+        LOG.error("Video create failed: %s", ex)
+        return _video_error(video.VideoAPIError(502, "upstream_error", str(ex)))
+    return jsonify(
+        id=job.get("id"),
+        status=job.get("status"),
+        cost=job.get("cost"),
+        currency=job.get("currency"),
+    )
+
+
+@app.route("/" + SERVICE_VERSION + "/video/<video_id>", methods=["GET"])
+def video_status(video_id):
+    try:
+        job = video.get_job(video_id)
+    except video.VideoAPIError as err:
+        return _video_error(err)
+    except Exception as ex:
+        LOG.error("Video status failed: %s", ex)
+        return _video_error(video.VideoAPIError(502, "upstream_error", str(ex)))
+    return jsonify(id=job.get("id"), status=job.get("status"), error=job.get("error"))
+
+
+@app.route("/" + SERVICE_VERSION + "/video/<video_id>/content", methods=["GET"])
+def video_content(video_id):
+    try:
+        upstream = video.open_content(video_id)
+    except video.VideoAPIError as err:
+        return _video_error(err)
+    except Exception as ex:
+        LOG.error("Video content failed: %s", ex)
+        return _video_error(video.VideoAPIError(502, "upstream_error", str(ex)))
+
+    def generate():
+        with upstream:
+            yield from upstream.iter_content(256 * 1024)
+
+    headers = {}
+    if upstream.headers.get("Content-Length"):
+        headers["Content-Length"] = upstream.headers["Content-Length"]
+    return Response(
+        stream_with_context(generate()), mimetype="video/mp4", headers=headers
+    )
 
 
 @app.route("/static/<asset_path>")
