@@ -66,7 +66,7 @@ PORT=5001 uv run python application.py
 
 ### Cosmic Birthday demo <a name="birthday"></a>
 
-Start the server, then open [http://127.0.0.1:5000/birthday](http://127.0.0.1:5000/birthday).
+Start the server, then open [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 Enter a date from 1995-06-16 through today to see that day's NASA Astronomy
 Picture of the Day. The page shows the image or video and its explanation. It
@@ -92,7 +92,7 @@ docker compose up --build
 1. Push your changes to GitHub and enable GitHub in your Build.io dashboard.
 2. Create an app, then set **Settings → Stack** to **dockerfile**.
 3. In **Deploy**, connect `dominiclizarraga/apod-api`, select `main`, and click **Deploy Branch**.
-4. Once it is running, open the app's public URL with `/birthday` at the end.
+4. Once it is running, open the app's public URL.
 
 The container starts Gunicorn on Build.io's assigned `PORT`. No database or NASA
 API key is needed. See the [Build.io deployment guide](https://docs.build.io/guides/deploying-applications/).

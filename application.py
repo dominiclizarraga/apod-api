@@ -345,7 +345,13 @@ def _get_json_for_date_range(start_date, end_date, use_concept_tags, thumbs):
 
 
 @app.route("/")
-def home():
+@app.route("/birthday")
+def birthday():
+    return render_template("birthday.html", today=datetime.today().date().isoformat())
+
+
+@app.route("/docs")
+def docs():
     return render_template(
         "home.html",
         version=SERVICE_VERSION,
@@ -353,11 +359,6 @@ def home():
         methodname=APOD_METHOD_NAME,
         usage=_usage(joinstr='", "', prestr='"') + '"',
     )
-
-
-@app.route("/birthday")
-def birthday():
-    return render_template("birthday.html", today=datetime.today().date().isoformat())
 
 
 def _video_error(err):
