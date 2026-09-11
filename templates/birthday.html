@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your Cosmic Birthday</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #081226; color: #eef4ff; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at 25% 10%, #263b83, transparent 38%), #081226; }
+    main { width: min(760px, calc(100% - 32px)); padding: 48px 0; }
+    h1 { font-size: clamp(2.2rem, 7vw, 4.5rem); line-height: .95; margin: 0; letter-spacing: -.06em; }
+    .lede { color: #b6c7e9; max-width: 600px; font-size: 1.1rem; line-height: 1.55; }
+    form { display: flex; gap: 12px; margin: 32px 0; flex-wrap: wrap; }
+    input, button { border-radius: 10px; border: 1px solid #6681b9; padding: 13px 16px; font: inherit; }
+    input { background: #101f3b; color: inherit; }
+    button { background: #f5c451; color: #17213a; cursor: pointer; font-weight: 800; }
+    .card { display: none; overflow: hidden; border: 1px solid #38538a; border-radius: 18px; background: #101d36; }
+    .card.show { display: block; }
+    img { display: block; width: 100%; max-height: 400px; object-fit: cover; }
+    .copy { padding: 24px; }
+    .eyebrow { color: #f5c451; font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h2 { margin: 8px 0; font-size: 1.75rem; }
+    #constellation { font-size: 1.3rem; font-weight: 700; color: #d6e3ff; }
+    #explanation { line-height: 1.55; color: #c2d0ed; }
+    #status { min-height: 24px; color: #f5c451; }
+    .note { color: #9fb0d3; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">NASA APOD demo</p>
+    <h1>Your cosmic<br>birthday</h1>
+    <p class="lede">Pick a birthday and see the Astronomy Picture of the Day from that date. If APOD names a constellation, we will surface it.</p>
+    <form id="birthday-form">
+      <input id="birthdate" type="date" min="1995-06-16" max="{{ today }}" required>
+      <button type="submit">Reveal my sky</button>
+    </form>
+    <p id="status" role="status"></p>
+    <article class="card" id="result">
+      <img id="image" alt="Astronomy Picture of the Day" hidden>
+      <div class="copy">
+        <p class="eyebrow" id="date-label"></p>
+        <h2 id="title"></h2>
+        <p id="constellation"></p>
+        <p id="explanation"></p>
+        <a id="source" target="_blank" rel="noreferrer">Open the original APOD</a>
+      </div>
+    </article>
+    <p class="note">APOD records begin on June 16, 1995. A constellation is shown only when it appears in that day’s APOD title or description.</p>
+  </main>
+  <script>
+    const constellations = ["Andromeda", "Antlia", "Apus", "Aquarius", "Aquila", "Ara", "Aries", "Auriga", "Boötes", "Caelum", "Camelopardalis", "Cancer", "Canes Venatici", "Canis Major", "Canis Minor", "Capricornus", "Carina", "Cassiopeia", "Centaurus", "Cepheus", "Cetus", "Chamaeleon", "Circinus", "Columba", "Coma Berenices", "Corona Australis", "Corona Borealis", "Corvus", "Crater", "Crux", "Cygnus", "Delphinus", "Dorado", "Draco", "Equuleus", "Eridanus", "Fornax", "Gemini", "Grus", "Hercules", "Horologium", "Hydra", "Hydrus", "Indus", "Lacerta", "Leo", "Lepus", "Libra", "Lupus", "Lynx", "Lyra", "Mensa", "Microscopium", "Monoceros", "Musca", "Norma", "Octans", "Ophiuchus", "Orion", "Pavo", "Pegasus", "Perseus", "Phoenix", "Pictor", "Pisces", "Piscis Austrinus", "Puppis", "Pyxis", "Reticulum", "Sagitta", "Sagittarius", "Scorpius", "Sculptor", "Scutum", "Serpens", "Sextans", "Taurus", "Telescopium", "Triangulum", "Tucana", "Ursa Major", "Ursa Minor", "Vela", "Virgo", "Volans", "Vulpecula"];
+    const form = document.querySelector("#birthday-form");
+    const status = document.querySelector("#status");
+    const result = document.querySelector("#result");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const birthday = document.querySelector("#birthdate").value;
+      status.textContent = "Looking up your cosmic birthday…";
+      result.classList.remove("show");
+      try {
+        const response = await fetch(`/v1/apod/?date=${encodeURIComponent(birthday)}&thumbs=True`);
+        const apod = await response.json();
+        if (!response.ok) throw new Error(apod.msg || "No APOD was found for that date.");
+        const text = `${apod.title || ""} ${apod.explanation || ""}`;
+        const found = constellations.filter((name) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "i").test(text));
+        document.querySelector("#date-label").textContent = `Your sky on ${apod.date}`;
+        document.querySelector("#title").textContent = apod.title;
+        document.querySelector("#constellation").textContent = found.length ? `Constellation mentioned: ${found.join(", ")}` : "No constellation is named in this APOD.";
+        document.querySelector("#explanation").textContent = apod.explanation;
+        const image = document.querySelector("#image");
+        const imageUrl = apod.media_type === "video" ? apod.thumbnail_url : apod.url;
+        image.hidden = !imageUrl;
+        image.src = imageUrl || "";
+        document.querySelector("#source").href = apod.url;
+        document.querySelector("#source").textContent = apod.media_type === "video" ? "Open the APOD video" : "Open the full image";
+        result.classList.add("show");
+        status.textContent = "";
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    });
+  </script>
+</body>
+</html>

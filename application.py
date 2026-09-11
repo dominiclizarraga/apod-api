@@ -16,6 +16,7 @@ adapted for AWS Elastic Beanstalk deployment
 """
 
 import logging
+import os
 from datetime import date, datetime, timezone
 from random import shuffle
 
@@ -342,6 +343,11 @@ def home():
     )
 
 
+@app.route("/birthday")
+def birthday():
+    return render_template("birthday.html", today=datetime.today().date().isoformat())
+
+
 @app.route("/static/<asset_path>")
 def serve_static(asset_path):
     return current_app.send_static_file(asset_path)
@@ -413,4 +419,4 @@ def app_error(e):
 
 
 if __name__ == "__main__":
-    app.run("0.0.0.0", port=5000, debug=True)
+    app.run("0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=True)

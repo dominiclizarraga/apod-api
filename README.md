@@ -37,13 +37,28 @@ git clone https://github.com/nasa/apod-api
 ```bash
 cd apod-api
 ```
-3. Install dependencies
+3. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+```bash
+# macOS (Homebrew)
+brew install uv
+```
+   On macOS or Linux without Homebrew, use the official installer instead:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+   Restart your shell if the installer reports that it updated your `PATH`.
+4. Install dependencies
 ```bash
 uv sync
 ```
-4. Run the application
+5. Run the application
 ```bash
 uv run python application.py
+```
+   The development server uses port 5000 by default. If it is in use, choose
+   another port:
+```bash
+PORT=5001 uv run python application.py
 ```
 &nbsp;
 
