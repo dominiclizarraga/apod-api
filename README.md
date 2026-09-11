@@ -16,8 +16,9 @@ No one watching this repository has anything to do with Astronomy Photo of the D
 # Table of contents
 1. [Getting Started](#getting_started)
     1. [Standard environment](#standard_env)
-    2. [Docker environment](#docker)
-    3. [Running Tests](#tests)
+    2. [Cosmic Birthday demo](#birthday)
+    3. [Docker environment](#docker)
+    4. [Running Tests](#tests)
 2. [Docs](#docs)
 3. [APOD parser](#TheAPODParser)
 4. [Deployed](#Deployed)
@@ -61,6 +62,14 @@ uv run python application.py
 PORT=5001 uv run python application.py
 ```
 &nbsp;
+
+### Cosmic Birthday demo <a name="birthday"></a>
+
+Start the server, then open [http://127.0.0.1:5000/birthday](http://127.0.0.1:5000/birthday).
+
+Enter a date from 1995-06-16 through today to see that day's NASA Astronomy
+Picture of the Day. The page shows the image or video and its explanation. It
+also names a constellation when the APOD text mentions one.
 
 ### Run it in Docker <a name="docker"></a>
 
