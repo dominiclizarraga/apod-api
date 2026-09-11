@@ -70,7 +70,8 @@ Start the server, then open [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 Enter a date from 1995-06-16 through today to see that day's NASA Astronomy
 Picture of the Day. The page shows the image or video and its explanation. It
-also names a constellation when the APOD text mentions one.
+also names a constellation when the APOD text mentions one. Select **Surprise
+me** to explore a random date.
 
 ### Run it in Docker <a name="docker"></a>
 

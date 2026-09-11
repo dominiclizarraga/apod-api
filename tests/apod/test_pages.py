@@ -33,3 +33,9 @@ class TestBirthdayPages(unittest.TestCase):
             res = self.client.get(f"/birthday/{day}")
             self.assertEqual(res.status_code, 302, day)
             self.assertIn("/birthday?date=", res.location)
+
+    def test_surprise_redirects_to_a_sky_page(self):
+        res = self.client.get("/birthday/surprise")
+        self.assertEqual(res.status_code, 302)
+        self.assertIn("/birthday/", res.location)
+        self.assertNotIn("/birthday/surprise", res.location)

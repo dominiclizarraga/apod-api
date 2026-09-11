@@ -1,7 +1,8 @@
 {% extends "birthday_base.html" %}
 
 {% block styles %}
-    form { display: flex; gap: 12px; margin: 32px 0; flex-wrap: wrap; }
+    form { display: flex; gap: 12px; margin: 32px 0 12px; flex-wrap: wrap; }
+    .surprise { display: inline-block; margin-bottom: 20px; color: #f5c451; font-weight: 800; text-underline-offset: 4px; }
     .recent { position: relative; left: 50%; translate: -50%; width: min(1100px, calc(100vw - 32px)); margin: 16px 0 32px; overflow-x: clip; outline: none; }
     .recent > .eyebrow { text-align: center; margin: 0 0 18px; }
     .stage { position: relative; aspect-ratio: 1100 / 470; max-height: 470px; touch-action: pan-y; }
@@ -40,12 +41,13 @@
 
 {% block content %}
     <p class="eyebrow">NASA APOD demo</p>
-    <h1>Your cosmic<br>birthday</h1>
-    <p class="lede">Pick a birthday and see the Astronomy Picture of the Day from that date. If APOD names a constellation, we will surface it.</p>
+    <h1>Your cosmic birthday,<br>anniversary, or any date!</h1>
+    <p class="lede">Pick a meaningful date and see its Astronomy Picture of the Day. If APOD names a constellation, we will surface it.</p>
     <form action="{{ url_for('birthday') }}" method="get">
       <input id="birthdate" name="date" type="date" min="{{ first_day }}" max="{{ today }}" required>
       <button type="submit">Reveal my sky</button>
     </form>
+    <a class="surprise" href="{{ url_for('surprise') }}">✨ Surprise me</a>
     <p id="status" role="status">{{ error or "" }}</p>
     <section class="recent loading" id="recent" tabindex="0" aria-roledescription="carousel" aria-label="Recent skies">
       <p class="eyebrow">Recent skies</p>

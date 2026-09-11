@@ -18,7 +18,7 @@ adapted for AWS Elastic Beanstalk deployment
 import logging
 import os
 from datetime import date, datetime, timezone
-from random import shuffle
+from random import choice, shuffle
 
 from dotenv import load_dotenv
 from flask import (
@@ -397,6 +397,14 @@ def sky(day):
     return render_template(
         "sky.html", day=dt.isoformat(), pretty_date=f"{dt:%B} {dt.day}, {dt.year}"
     )
+
+
+@app.route("/birthday/surprise")
+def surprise():
+    ordinal = choice(
+        range(FIRST_APOD_DAY.toordinal(), datetime.today().date().toordinal() + 1)
+    )
+    return redirect(url_for("sky", day=date.fromordinal(ordinal).isoformat()))
 
 
 def _video_error(err):
